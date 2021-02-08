@@ -186,7 +186,7 @@ log_probability = posterior.log_prob(samples, x= observation)
 
 ss=[]
 
-for i in ['100', '50', '12']:
+for i in ['100']: #, '50', '12'
     s= pd.read_csv( i +'ksamples__SBI_100ksim.csv')   
     ss.append(s.values)
 
@@ -201,8 +201,7 @@ points = torch.cat([torch.ones(1)*1.5,torch.ones(1)*750.,torch.ones(1)*2000.])
 
 fig, axes = utils.pairplot(samples, points, limits=[[0.,2.],[0.,2000],[1500.,2500]], fig_size=(7,7), \
                            labels = ['log_gamma \n normal(0.,2.)', 'Tint \n U(0.,1500)', 'Tequ \n U(0.,4000)'],\
-                           title= 'SNRE \n BU_new prior :' + str(100) + 'k simulations, '+ str(162) + 'k samples',\
+                           title= 'SNRE \n BU_new prior :' + str(100) + 'k simulations, '+ str(100) + 'k samples',\
                           points_colors = ['red'])
 
-
-
+####################################################################################################################
