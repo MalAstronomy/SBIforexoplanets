@@ -217,3 +217,52 @@ def similar(a):
 
 similar(fr)
 
+################################################################################################################################
+
+# plotting PT profiles with lof prob
+
+# creating P-T profile for each - takes around 10 min
+temp = []
+cc=[]
+fig, ax = plt.subplots(1, figsize=(10,10))
+plt.title('SBI 100ksamp e76 200kSim')
+start = time.time()
+c1=0
+c2=0
+c3=0
+c4=0
+
+for i in np.random.randint(0,199999, 10):  #np.arange(0,99999):  #
+    index, log_gamma, T_int, T_equ = [df_samples[row][i] for row in df_samples]
+    ind, lnprob = [df_lnprob[row][i] for row in df_lnprob]
+    cc.append(color(lnprob)) 
+    gamma = np.exp(log_gamma)
+    temperature = nc.guillot_global(pressures, kappa_IR, gamma, gravity, T_int, T_equ)
+    if ((color(lnprob)> 95) and (color(lnprob)<100)):
+        ax.plot(temperature, pressures, c='darkblue', label = "95<prob<100" if c1 == 0 else "") #viridis,jet,gray,parula(?),magma,plasma,inferno-plt.cm.inferno(color(lnprob))
+        c1+=1
+    elif ((color(lnprob)> 80) and (color(lnprob)<95)):
+        ax.plot(temperature, pressures, c='dodgerblue',label = "80<prob<95" if c2 == 0 else "") #if i == 0 else ""
+        c2+=1
+    else :
+        ax.plot(temperature, pressures, c='skyblue', label = "prob<80" if c3 == 0 else "")
+        c3+=1
+    ax.plot(temperature0, pressures, c= 'red', label = 'observation value' if c4 == 0 else "")
+    c4+=1
+#     plt.plot(temperature1, pressures, c= 'red')
+#     plt.plot(temperature2, pressures, c= 'red')
+    plt.yscale('log')
+    plt.ylim([1e2, 1e-6])
+    plt.xlabel('T (K)')
+    plt.ylabel('P (bar)')
+    temp.append(temperature)
+#plt.savefig('/home/mvasist/results/SNRE/PT_profile/SBI_162ksamp_100kSim.png')
+handles,labels = ax.get_legend_handles_labels()
+handles = [handles[0], handles[2],  handles[3], handles[1]]
+labels = [labels[0], labels[2], labels[3], labels[1]]
+ax.legend(handles,labels)
+plt.show()
+
+end =time.time()
+print('it takes: '+ str((end-start)/60) + ' min')
+
