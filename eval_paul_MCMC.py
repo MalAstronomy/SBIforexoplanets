@@ -28,8 +28,8 @@ from emcee.utils import MPIPool
 
 #from Simulator import Simulator
 
-retrieval_name = 'JWST_emission_petitRADTRANSpaper'
-absolute_path = 'output/'# end with forward slash!
+retrieval_name = 'MCMC_200w500it_TintLkIRLg'   ###########################change this 
+absolute_path = 'output1/'# end with forward slash!
 op= '/home/mvasist/petitRADTRANS/petitRADTRANS/retrieval_examples/emission/'
 observation_files = {}
 observation_files['NIRISS SOSS'] = op +'NIRISS_SOSS_flux.dat'
@@ -37,10 +37,11 @@ observation_files['NIRSpec G395M'] = op +'NIRSpec_G395M_flux.dat'
 observation_files['MIRI LRS'] = op +'MIRI_LRS_flux.dat'
 
 # Wavelength range of observations, fixed parameters that will not be retrieved
-WLEN = [0.3, 15.0]
-# LOG_G =  2.58
-# R_pl =   1.84*nc.r_jup_mean
+WLENGTH = [0.3, 15.0]
+R_pl =   1.84*nc.r_jup_mean
 R_star = 1.81*nc.r_sun
+gamma = 1
+t_equ= 0
 # Get host star spectrum to calculate F_pl / F_star later.
 T_star = 6295.
 x = nc.get_PHOENIX_spec(T_star)
@@ -92,11 +93,12 @@ def a_b_range(x, a, b):
 
 log_priors = {}
 
-log_priors['t_int']          = lambda x: a_b_range(x, 0., 1500.)
-log_priors['t_equ']          = lambda x: a_b_range(x, 0., 4000.)
-log_priors['log_g']          = lambda x: a_b_range(x, 2.0, 3.7)
+log_priors['t_int']          = lambda x: a_b_range(x, 0., 2000.) 
+log_priors['log_kappa_IR']   = lambda x: a_b_range(x, -4, 0)
+log_priors['log_gravity']    = lambda x: a_b_range(x, 2.0, 3.7)
 
-    
+#lambda x: -((x-(-0.0))/2.)**2./2.
+
 def Simulator_paul(params): 
     ##################
 
@@ -107,27 +109,20 @@ def Simulator_paul(params):
                                           'Na', 'K'], \
               rayleigh_species = ['H2', 'He'], \
               continuum_opacities = ['H2-H2', 'H2-He'], \
-              wlen_bords_micron = [0.3, 15])#, mode='c-k')
+              wlen_bords_micron = WLENGTH)#, mode='c-k')
 
     pressures = np.logspace(-6, 2, 100)
     atmosphere.setup_opa_structure(pressures)
     temperature = 1200. * np.ones_like(pressures)
-
-    R_pl = 1.838*nc.r_jup_mean
     
-    log_g = 2.45                                #params[5]
-    log_P0 = -2                                 #params[6] 
+    t_int = params[0]                             #200.
+    log_kappa_IR = params[1]                      #-2
+    log_gravity = params[2]                       #params[5].numpy() 1e1**2.45 
 
-    kappa_IR = 0.01
-    log_gamma = params[0]                            # log(0.4)
-    T_int = params[1]                                 #200.
-    T_equ = params[2]                                 #1500.
+    gravity = np.exp(log_gravity)
+    kappa_IR = np.exp(log_kappa_IR)
     
-    gravity = np.exp(log_g)
-    P0 = np.exp(log_P0)
-    gamma = np.exp(log_gamma)
-
-    temperature = nc.guillot_global(pressures, kappa_IR, gamma, gravity, T_int, T_equ)
+    temperature = nc.guillot_global(pressures, kappa_IR, gamma, gravity, t_int, t_equ)
     
     # Make dictionary for log 'metal' abundances    
     abundances = {}
@@ -140,17 +135,11 @@ def Simulator_paul(params):
     abundances['Na'] = 0.00001 * np.ones_like(temperature)      #np.exp(params[11]) * np.ones_like(temperature)
     abundances['K'] = 0.000001 * np.ones_like(temperature)      #np.exp(params[12]) * np.ones_like(temperature)
     
+    log_prior = 0
     
-    # Make dictionary for modified Guillot parameters
-    temp_params = {}
-    temp_params['t_int'] = T_int
-    temp_params['t_equ'] = T_equ
-    
-    # Prior calculation of all input parameters
-    log_prior = 0.
-
-    for key in temp_params.keys():
-        log_prior += log_priors[key](temp_params[key])
+    log_prior += log_priors['t_int'](t_int)
+    log_prior += log_priors['log_kappa_IR'](log_kappa_IR)        
+    log_prior += log_priors['log_gravity'](log_gravity)
 
     # Return -inf if parameters fall outside prior distribution
     if (log_prior == -np.inf):
@@ -163,7 +152,7 @@ def Simulator_paul(params):
     
     atmosphere.calc_flux(temperature, abundances, gravity, MMW)
 
-    wlen, flux_nu = nc.c/atmosphere.freq/1e-4/10000, atmosphere.flux/1e-6
+    wlen, flux_nu = nc.c/atmosphere.freq, atmosphere.flux/1e-6
     
 
     # Just to make sure that a long chain does not die
@@ -184,7 +173,7 @@ def Simulator_paul(params):
 
     ################################################additions################################################
     
-    observation = np.array(torch.load('/home/mvasist/scripts/3_param_observation.pt').numpy())
+    observation = np.array(torch.load('/home/mvasist/scripts/3param_observation_TintkIRLg.pt').numpy())
 
     ####################################################################
     ####### Calculate log-likelihood
@@ -206,17 +195,17 @@ def lnprob(x):
     
 # Retrieval hyperparameters
 stepsize = 1.75
-n_walkers = 240
-n_iter = 50
+n_walkers = 200
+n_iter = 500
 
 n_dim = len(log_priors)
 
 
-p0 = [np.array([np.random.normal(loc = 0., scale = 2., size=1)[0], \
-                0.+1500.*np.random.uniform(size=1)[0], \
-                0.+4000.*np.random.uniform(size=1)[0],] \
+p0 = [np.array([0.+2000.*np.random.uniform(size=1)[0], \
+                -4 + 4*np.random.uniform(size=1)[0], \
+                2.+3.7*np.random.uniform(size=1)[0]] \
                 ) for i in range(n_walkers)]
-
+#np.random.normal(loc = 0., scale = 2., size=1)[0]
 ##############################################################################################################################
 
 # Multiprocessing
@@ -252,7 +241,7 @@ highest_prob_index = np.unravel_index(sampler.lnprobability.argmax(), \
                                           sampler.lnprobability.shape)
 best_position = sampler.chain[highest_prob_index]
 
-f = open('/home/mvasist/samples_paul_MCMC/best_position_pre_burn_in_' + retrieval_name + str(sys.argv[1]) + '.dat', 'w')
+f = open('/home/mvasist/samples_paul_MCMC/1/best_position_pre_burn_in_' + retrieval_name + str(sys.argv[1]) + '.dat', 'w')
 f.write(str(best_position))
 f.close()
 
@@ -262,9 +251,9 @@ print('best pos is done')
 
 # Run actual chain
 
-p0 = [np.array([best_position[0]+np.random.normal(size=1)[0]*0.5, \
-                best_position[1]+np.random.normal(size=1)[0]*70., \
-                best_position[2]+np.random.normal(size=1)[0]*200.] \
+p0 = [np.array([best_position[0]+np.random.normal(size=1)[0]*200., \
+                best_position[1]+np.random.normal(size=1)[0]*0.5, \
+                best_position[2]+np.random.normal(size=1)[0]*0.5] \
                    ) for i in range(n_walkers)] 
     
 if cluster:
@@ -289,7 +278,7 @@ print('actual chain is done')
     
 # Saving results   
 
-f = open('/home/mvasist/samples_paul_MCMC/chain_pos_' + retrieval_name + str(sys.argv[1]) + '.pickle','wb')
+f = open('/home/mvasist/samples_paul_MCMC/1/chain_pos_' + retrieval_name + str(sys.argv[1]) + '.pickle','wb')
 pickle.dump(pos,f)
 pickle.dump(prob,f)
 pickle.dump(state,f)
@@ -298,7 +287,7 @@ pickle.dump(samples,f)
 f.close()
 
 
-with open('/home/mvasist/samples_paul_MCMC/chain_lnprob_' + retrieval_name + str(sys.argv[1]) + '.pickle', 'wb') as f:
+with open('/home/mvasist/samples_paul_MCMC/1/chain_lnprob_' + retrieval_name + str(sys.argv[1]) + '.pickle', 'wb') as f:
     pickle.dump([sampler.lnprobability], \
                 f, protocol=pickle.HIGHEST_PROTOCOL)
     

@@ -21,9 +21,6 @@ from sbi.utils.get_nn_models import posterior_nn
 from sbi import utils as utils
 from sbi.types import Array, OneOrMore, ScalarFloat
 
-
-retrieval_name = 'JWST_emission_petitRADTRANSpaper'
-absolute_path = 'output/'# end with forward slash!
 op= '/home/mvasist/petitRADTRANS/petitRADTRANS/retrieval_examples/emission/'
 observation_files = {}
 # observation_files['NIRISS SOSS'] = op +'NIRISS_SOSS_flux.dat'
@@ -31,10 +28,12 @@ observation_files = {}
 observation_files['MIRI LRS'] = op +'MIRI_LRS_flux.dat'
 
 # Wavelength range of observations, fixed parameters that will not be retrieved
-# WLEN = [0.8, 14.0]
+WLENGTH = [0.3, 15.0]
 # LOG_G =  2.58
-# R_pl =   1.84*nc.r_jup_mean
+R_pl =   1.84*nc.r_jup_mean
 R_star = 1.81*nc.r_sun
+gamma = 1
+t_equ= 0
 # Get host star spectrum to calculate F_pl / F_star later.
 T_star = 6295.
 x = nc.get_PHOENIX_spec(T_star)
@@ -54,6 +53,7 @@ data_flux_nu_error = {}
 data_wlen_bins = {}
 
 for name in observation_files.keys():
+#         print(name)
     dat_obs = np.genfromtxt(observation_files[name])
     data_wlen[name] = dat_obs[:,0]*1e-4
     data_flux_nu[name] = dat_obs[:,1]
@@ -72,28 +72,26 @@ def Simulator(params):
                                           'Na', 'K'], \
           rayleigh_species = ['H2', 'He'], \
           continuum_opacities = ['H2-H2', 'H2-He'], \
-          wlen_bords_micron = [0.3, 15])#, mode='c-k')
+          wlen_bords_micron = WLENGTH)#, mode='c-k')
 
 
     pressures = np.logspace(-6, 2, 100)
     atmosphere.setup_opa_structure(pressures)
     temperature = 1200. * np.ones_like(pressures)
 
-    R_pl = 1.838*nc.r_jup_mean
-    gravity = 1e1**2.45                           #1e1**2.45  params[5].numpy()
-    P0 = 0.01                                     #0.01       params[6].numpy() 
-
-    kappa_IR = 0.01
-    log_gamma = params[0].numpy()                         # log 1.5 - 0.4
-    T_int = params[1].numpy()                             #200.
-    T_equ = params[2].numpy()                             #1500.
     
-    gamma = np.exp(log_gamma)
-    temperature = nc.guillot_global(pressures, kappa_IR, gamma, gravity, T_int, T_equ)
+    t_int = params[0].numpy()                             #200.
+    log_kappa_IR = params[1].numpy()                      #-2
+    log_gravity = params[2].numpy()                       #params[5].numpy() 1e1**2.45 
 
+    gravity = np.exp(log_gravity)
+    kappa_IR = np.exp(log_kappa_IR)
+    
+    temperature = nc.guillot_global(pressures, kappa_IR, gamma, gravity, t_int, t_equ)
+    
     abundances = {}
-    abundances['H2'] = 0.74 * np.ones_like(temperature) #0.74 * np.ones_like(temperature) (params[3].numpy())
-    abundances['He'] = 0.24 * np.ones_like(temperature)  #0.24 * np.ones_like(temperature) (params[4].numpy())
+    abundances['H2'] = 0.75 * np.ones_like(temperature) #0.74 * np.ones_like(temperature) (params[3].numpy())
+    abundances['He'] = 0.25 * np.ones_like(temperature)  #0.24 * np.ones_like(temperature) (params[4].numpy())
     abundances['H2O'] = 0.001 * np.ones_like(temperature)
     abundances['CO_all_iso'] = 0.01 * np.ones_like(temperature)
     abundances['CO2'] = 0.00001 * np.ones_like(temperature)
@@ -102,10 +100,11 @@ def Simulator(params):
     abundances['K'] = 0.000001 * np.ones_like(temperature)
 
     MMW = rm.calc_MMW(abundances) * np.ones_like(temperature)
-
+    #print(MMW, abundances)
+    
     atmosphere.calc_flux(temperature, abundances, gravity, MMW)
 
-    wlen, flux_nu = nc.c/atmosphere.freq/1e-4/10000, atmosphere.flux/1e-6
+    wlen, flux_nu = nc.c/atmosphere.freq, atmosphere.flux/1e-6
 
 
     # Just to make sure that a long chain does not die
@@ -123,13 +122,18 @@ def Simulator(params):
     flux_rebinned = rgw.rebin_give_width(wlen, flux_sq, \
                 data_wlen['MIRI LRS'], data_wlen_bins['MIRI LRS'])
 
+    #flux_rebinned = np.reshape(flux_rebinned, (371,1))    
+
     FR= torch.Tensor(flux_rebinned)
+    
+    return FR    
 
-    return FR
+# Prior= BoxUniform_New(a=torch.tensor([0.4, 0, 0, 0.64, 0.14, np.exp(2.45), 0.01]), \
+#                              b=torch.tensor([0.1, 1500, 4000, 0.84, 0.34, np.exp(2.45), 0.01]))
 
-Prior= BoxUniform_New(a=torch.tensor([0., 0, 0 ]), b=torch.tensor([2., 1500, 4000]))
+Prior= utils.BoxUniform(low=torch.tensor([0., -4 , 2 ]), high=torch.tensor([2000., 0, 3.7 ]))
                              
-sim = 10000
+sim = 1000
 
 simulator, prior = prepare_for_sbi(Simulator, Prior)
 
@@ -140,6 +144,5 @@ for i in range(0, int(sim/100)):
     theta, x = simulate_for_sbi(simulator, proposal=prior, num_simulations= 100)
     T = pd.DataFrame(theta.numpy())
     X = pd.DataFrame(x.numpy())
-    X.to_csv('/home/mvasist/simulations/3_params/X_' + str(sys.argv[1]) + '.csv',mode='a', header=False)
-    T.to_csv('/home/mvasist/simulations/3_params/T_' + str(sys.argv[1]) + '.csv',mode='a', header=False)
-
+    X.to_csv('/home/mvasist/simulations/3_params/1/X_100ksim_TintLkIRLg' + str(sys.argv[1]) + '.csv',mode='a', header=False)
+    T.to_csv('/home/mvasist/simulations/3_params/1/T_100ksim_TintLkIRLg' + str(sys.argv[1]) + '.csv',mode='a', header=False)
