@@ -77,25 +77,18 @@ class Coverage_class:
         p1 = p1.to(hypothesis.accelerator)
         p2 = p2.to(hypothesis.accelerator)
         p3 = p3.to(hypothesis.accelerator) #####
-#         print(p1)
-#         print(p1.size())
+
         g1, g2, g3 = torch.meshgrid(p1.view(-1), p2.view(-1), p3.view(-1)) ######
-#         print(g1.size())
+
         # Vectorize
         inputs = torch.cat([g1.reshape(-1, 1), g2.reshape(-1, 1), g3.reshape(-1, 1)], dim=1) #####
         log_prior_probabilities = self.prior.log_prob(inputs).sum(axis=1).view(-1, 1)
-#         print(log_prior_probabilities.size())#, log_prior_probabilities)
-#         print('ob ', observable.size())
+
         observables = observable.repeat(resolution ** 3, 1).float() #######
         observables = observables.to(hypothesis.accelerator)
-#         print(observables.size(), inputs.size())
         #observables = observables.view(-1, 371)   # for mlp only
-#         print(observables.size(), inputs.size())
         log_ratios = r._classifier_logits(inputs, observables, num_atoms=2)
-        #log_posterior = (log_prior_probabilities + log_ratios).view(resolution, resolution, resolution).cpu()
-        #print(len(inputs))
         log_posterior = (log_prior_probabilities + log_ratios[:len(inputs)]).view(resolution, resolution, resolution).cpu() ##   
-        #print(log_posterior.size())
         return log_posterior
     
     @torch.no_grad()
@@ -105,9 +98,7 @@ class Coverage_class:
         
         log_ratios = r._classifier_logits(inputs.repeat(2,1), outputs.repeat(2,1), num_atoms=2) #################
         log_ratios = log_ratios[:len(inputs)]
-        #print('lr: ', log_ratios)
         log_prior = self.prior.log_prob(inputs).sum(axis=1)    
-        #print('lpr: ', log_prior)
         return (log_prior + log_ratios).squeeze()
     
     @torch.no_grad()
@@ -123,8 +114,6 @@ class Coverage_class:
             nominal = nominal.to(hypothesis.accelerator)
             observable = observable.to(hypothesis.accelerator)
             pdf = self.compute_log_posterior(r, observable, resolution=resolution, extent=extent).exp().view(resolution, resolution, resolution) ############
-#             print('pdf ', pdf)
-#             print('im outside')
             nominal_pdf = self.compute_log_pdf(r, nominal, observable).exp()
             level = self.highest_density_level(pdf, alpha)
             if nominal_pdf >= level:
