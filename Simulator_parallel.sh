@@ -7,8 +7,8 @@
 #SBATCH --ntasks=1
 #SBATCH --mem-per-cpu=2626 # megabytes
 #
-#SBATCH --output=/home/mvasist/scripts/output1/3param_out_100k_-%A-%a.txt
+#SBATCH --output=/home/mvasist/scripts/output1/4param_out_1M_-%A-%a.txt
 
 conda activate petitRT
 cd /home/mvasist/scripts/parallel/
-srun python 3param_Simulator.py $SLURM_ARRAY_TASK_ID
+srun python Simulator.py $SLURM_ARRAY_TASK_ID

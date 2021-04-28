@@ -90,9 +90,9 @@ def Simulator(params):
     temperature = nc.guillot_global(pressures, kappa_IR, gamma, gravity, t_int, t_equ)
     
     abundances = {}
-    abundances['H2'] = 0.75 * np.ones_like(temperature) #0.74 * np.ones_like(temperature) (params[3].numpy())
+    abundances['H2'] = 0.75 * np.ones_like(temperature)  #0.74 * np.ones_like(temperature) (params[3].numpy())
     abundances['He'] = 0.25 * np.ones_like(temperature)  #0.24 * np.ones_like(temperature) (params[4].numpy())
-    abundances['H2O'] = 0.001 * np.ones_like(temperature)
+    abundances['H2O'] = np.exp(params[3].numpy()) * np.ones_like(temperature)    #0.001 * np.ones_like(temperature)
     abundances['CO_all_iso'] = 0.01 * np.ones_like(temperature)
     abundances['CO2'] = 0.00001 * np.ones_like(temperature)
     abundances['CH4'] = 0.000001 * np.ones_like(temperature)
@@ -131,7 +131,7 @@ def Simulator(params):
 # Prior= BoxUniform_New(a=torch.tensor([0.4, 0, 0, 0.64, 0.14, np.exp(2.45), 0.01]), \
 #                              b=torch.tensor([0.1, 1500, 4000, 0.84, 0.34, np.exp(2.45), 0.01]))
 
-Prior= utils.BoxUniform(low=torch.tensor([0., -4 , 2 ]), high=torch.tensor([2000., 0, 3.7 ]))
+Prior= utils.BoxUniform(low=torch.tensor([0., -4 , 2 , -10]), high=torch.tensor([2000., 0, 3.7, 0 ]))
                              
 sim = 1000
 
@@ -144,5 +144,5 @@ for i in range(0, int(sim/100)):
     theta, x = simulate_for_sbi(simulator, proposal=prior, num_simulations= 100)
     T = pd.DataFrame(theta.numpy())
     X = pd.DataFrame(x.numpy())
-    X.to_csv('/home/mvasist/simulations/3_params/1/X_100ksim_TintLkIRLg' + str(sys.argv[1]) + '.csv',mode='a', header=False)
-    T.to_csv('/home/mvasist/simulations/3_params/1/T_100ksim_TintLkIRLg' + str(sys.argv[1]) + '.csv',mode='a', header=False)
+    X.to_csv('/home/mvasist/simulations/4_params/1/X_100ksim_TintLkIRLgLH2O' + str(sys.argv[1]) + '.csv',mode='a', header=False)
+    T.to_csv('/home/mvasist/simulations/4_params/1/T_100ksim_TintLkIRLgLH2O' + str(sys.argv[1]) + '.csv',mode='a', header=False)
