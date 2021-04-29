@@ -22,8 +22,8 @@ from sbi.utils.get_nn_models import posterior_nn
 from sbi import utils as utils
 from sbi.types import Array, OneOrMore, ScalarFloat
 
-# from Coverage_ClassLogits import Coverage_class
-from Coverage_BuildPosterior import Coverage_class
+from Coverage_ClassLogits import Coverage_class as cCL
+from Coverage_BuildPosterior import Coverage_class as cBP
 
 np.set_printoptions(threshold=sys.maxsize)
 torch.set_printoptions(threshold=10_000)
@@ -235,13 +235,18 @@ confidence_level = 0.95
 
 ratio_estimator = inference   
 
-#cov = Coverage_class().coverage(ratio_estimator, inputs_new, outputs_new, confidence_level) # Play with the confidence level!
-cov = Coverage_class().coverage(ratio_estimator, inputs, outputs, confidence_level) # Play with the confidence level!
-cov = [str(cov)]
-cov = {'cov': cov}
+cov_CL = cCL().coverage(ratio_estimator, inputs, outputs, confidence_level) # Play with the confidence level!
+cov_BP = cBP().coverage(ratio_estimator, inputs, outputs, confidence_level) # Play with the confidence level!
 
-df_samples = pd.DataFrame(cov, columns=['cov'])
-df_samples.to_csv('/home/mvasist/scripts/coverage.csv',mode='a', header=False)
+cov_bp = {'method': 'Build Posterior', 'cov': [str(cov_BP)]}
+cov_cl = {'method': 'Class Logits', 'cov': [str(cov_CL)]}
+
+df_samples = pd.DataFrame(cov_bp, columns=['method', 'cov'])
+df_samples.to_csv('/home/mvasist/scripts/coverage/coverage_bp.csv',mode='a', header=False)
+
+
+df_samples = pd.DataFrame(cov_cl, columns=['method', 'cov'])
+df_samples.to_csv('/home/mvasist/scripts/coverage/coverage_cl.csv',mode='a', header=False)
    
 
     
