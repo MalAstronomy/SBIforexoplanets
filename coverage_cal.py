@@ -28,6 +28,8 @@ from Coverage_BuildPosterior import Coverage_class as cBP
 np.set_printoptions(threshold=sys.maxsize)
 torch.set_printoptions(threshold=10_000)
 
+## loading data
+
 op= '/home/mvasist/petitRADTRANS/petitRADTRANS/retrieval_examples/emission/'
 observation_files = {}
 observation_files['NIRISS SOSS'] = op +'NIRISS_SOSS_flux.dat'
@@ -141,68 +143,39 @@ def Simulator(params):
     
     return FR    
 
+# Preparing for SBI 
+
 Prior= utils.BoxUniform(low=torch.tensor([0., -4 , 2 ]), high=torch.tensor([2000., 0, 3.7 ]))
-
 simulator, prior = prepare_for_sbi(Simulator, Prior)
-
 inference = SNRE_A(prior= Prior, device= 'cpu', classifier='mlp')
 
-#reading the csv file
-
-# Xpd= pd.read_csv('X_1M.csv')
-# Tpd= pd.read_csv('T_1M.csv')
+# Reading the simulations - 100k simulations
 
 X=[]
 T=[]
-
-# for i in range(1,11):
-# #     print(i)
-#     dfX= pd.read_csv('/home/mvasist/simulations/3_params/X_'+ str(i) + '.csv')
-#     dfT= pd.read_csv('/home/mvasist/simulations/3_params/T_'+ str(i) + '.csv')
-#     X.append(dfX.values)
-#     T.append(dfT.values)
-    
-# for j in range(1,51):
-#     dfX_= pd.read_csv('/home/mvasist/simulations/3_params/_X_'+ str(i) + '.csv')
-#     dfT_= pd.read_csv('/home/mvasist/simulations/3_params/_T_'+ str(i) + '.csv')
-#     X.append(dfX_.values)
-#     T.append(dfT_.values)
-    
-# for k in range(1, 101):
-#     dfX_M= pd.read_csv('/home/mvasist/simulations/3_params/X_1Msim_'+ str(k) + '.csv', low_memory = False) #chunksize=1000, iterator=True, dtype={'col2': np.float32}
-#     dfT_M= pd.read_csv('/home/mvasist/simulations/3_params/T_1Msim_'+ str(k) + '.csv', low_memory = False)
-#     X.append(dfX_M.values) #for x,t in zip(dfX_M,dfT_M):
-#     T.append(dfT_M.values)
-
-
-#log gamma, Tequ and log gravity 
 for k in range(1, 101):
     if k==15: continue
     dfX_M= pd.read_csv('/home/mvasist/simulations/3_params/1/X_100ksim_TintLkIRLg'+ str(k) + '.csv', low_memory = False) #chunksize=1000, iterator=True, dtype={'col2': np.float32}
     dfT_M= pd.read_csv('/home/mvasist/simulations/3_params/1/T_100ksim_TintLkIRLg'+ str(k) + '.csv', low_memory = False)
     X.append(dfX_M.values) #for x,t in zip(dfX_M,dfT_M):
     T.append(dfT_M.values)
-
-# data = pd.read_csv(filepath, chunksize=1000, iterator=True) 
-#Loop through the chunks and process the data
     
 comb_np_array_X = np.vstack(X)
 comb_np_array_T = np.vstack(T)
-
 Xframe = pd.DataFrame(comb_np_array_X)
 Tframe = pd.DataFrame(comb_np_array_T)
-
 list_of_tensors_X = [torch.tensor(np.array(Xframe),dtype=torch.float32)]
 list_of_tensors_T = [torch.tensor(np.array(Tframe),dtype=torch.float32)] #torch.tensor
-
 XX = torch.cat(list_of_tensors_X)[:, 1:]
 TT = torch.cat(list_of_tensors_T)[:,1:]
 
-inference = inference.append_simulations(TT, XX) #TT[:1000], XX[:1000]) #(TT, XX) #
+inference = inference.append_simulations(TT, XX) #TT[:1000], XX[:1000]) #(TT, XX) 
+
+# Training the density estimator
     
 density_estimator = inference.train()
 
-#i/p and o/p
+# i/p and o/p - 10k simulations
 
 for k in range(1, 101):
     if k==1: continue
@@ -214,26 +187,25 @@ for k in range(1, 101):
     
 comb_np_array_X = np.vstack(X)
 comb_np_array_T = np.vstack(T)
-
 Xframe = pd.DataFrame(comb_np_array_X)
 Tframe = pd.DataFrame(comb_np_array_T)
-
 list_of_tensors_X = [torch.tensor(np.array(Xframe),dtype=torch.float32)]
 list_of_tensors_T = [torch.tensor(np.array(Tframe),dtype=torch.float32)] #torch.tensor
-
 outputs = torch.cat(list_of_tensors_X)[:, 1:]
 inputs = torch.cat(list_of_tensors_T)[:,1:]
 
 # n = 100
 # indices = np.random.choice(np.arange(len(inputs)), n, replace=False)
-
 # inputs_new = inputs[indices]
 # outputs_new = outputs[indices]
 
 
-confidence_level = 0.95
+# Confidence level
 
+confidence_level = 0.95
 ratio_estimator = inference   
+
+# Calculating coverage
 
 cov_CL = cCL().coverage(ratio_estimator, inputs, outputs, confidence_level) # Play with the confidence level!
 cov_BP = cBP().coverage(ratio_estimator, inputs, outputs, confidence_level) # Play with the confidence level!
@@ -243,7 +215,6 @@ cov_cl = {'method': 'Class Logits', 'cov': [str(cov_CL)]}
 
 df_samples = pd.DataFrame(cov_bp, columns=['method', 'cov'])
 df_samples.to_csv('/home/mvasist/scripts/coverage/coverage_bp.csv',mode='a', header=False)
-
 
 df_samples = pd.DataFrame(cov_cl, columns=['method', 'cov'])
 df_samples.to_csv('/home/mvasist/scripts/coverage/coverage_cl.csv',mode='a', header=False)
