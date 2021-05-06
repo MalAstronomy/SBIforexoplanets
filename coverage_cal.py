@@ -23,7 +23,7 @@ from sbi.utils.get_nn_models import posterior_nn
 from sbi import utils as utils
 from sbi.types import Array, OneOrMore, ScalarFloat
 
-from Coverage_ClassLogits import Coverage_class as cCL
+#from Coverage_ClassLogits import Coverage_class as cCL
 from Coverage_BuildPosterior import Coverage_class as cBP
 
 np.set_printoptions(threshold=sys.maxsize)
@@ -182,10 +182,10 @@ density_estimator = inference.train()
 # pickle.dump(an_obj, file_to_store)
 # file_to_store.close()
 
-an_obj1 = density_estimator
-file_to_store1 = open("density_estimators/density_estimator_3param_100kSim_mlp_e.pickle", "wb")
-pickle.dump(an_obj1, file_to_store1)
-file_to_store1.close()
+# an_obj1 = density_estimator
+# file_to_store1 = open("density_estimators/density_estimator_3param_100kSim_mlp_e.pickle", "wb")
+# pickle.dump(an_obj1, file_to_store1)
+# file_to_store1.close()
 
 
 # # Using a trained density estimator
@@ -196,7 +196,7 @@ file_to_store1.close()
 X_=[]
 T_=[]
 
-for k_ in range(1, 101):
+for k_ in range(1, 10):# 101):
     if k_==1: continue
     if k_==15: continue
     dfX_M_= pd.read_csv('/home/mvasist/simulations/3_params/1/X_10ksim_TintkIRLg'+ str(k_) + '.csv', low_memory = False) #chunksize=1000, iterator=True, dtype={'col2': np.float32}
@@ -208,7 +208,7 @@ comb_np_array_X_ = np.vstack(X_)
 comb_np_array_T_ = np.vstack(T_)
 Xframe_ = pd.DataFrame(comb_np_array_X_)
 Tframe_ = pd.DataFrame(comb_np_array_T_)
-lit_of_tensors_X_ = [torch.tensor(np.array(Xframe_),dtype=torch.float32)]
+list_of_tensors_X_ = [torch.tensor(np.array(Xframe_),dtype=torch.float32)]
 list_of_tensors_T_ = [torch.tensor(np.array(Tframe_),dtype=torch.float32)] #torch.tensor
 outputs = torch.cat(list_of_tensors_X_)[:, 1:]
 inputs = torch.cat(list_of_tensors_T_)[:,1:]
@@ -218,6 +218,7 @@ inputs = torch.cat(list_of_tensors_T_)[:,1:]
 # inputs_new = inputs[indices]
 # outputs_new = outputs[indices]
 
+print(len(inputs),'/',len(XX))
 
 # Confidence level
 
@@ -226,17 +227,16 @@ ratio_estimator = inference
 
 # Calculating coverage
 
-cov_CL = cCL().coverage(ratio_estimator, inputs, outputs, confidence_level) # Play with the confidence level!
-cov_BP = cBP().coverage(ratio_estimator, inputs, outputs, confidence_level) # Play with the confidence level!
 
+cov_BP= cBP().coverage(ratio_estimator, inputs, outputs, confidence_level) # Play with the confidence level!
 cov_bp = {'method': 'Build Posterior', 'cov': [str(cov_BP)]}
-cov_cl = {'method': 'Class Logits', 'cov': [str(cov_CL)]}
-
 df_samples = pd.DataFrame(cov_bp, columns=['method', 'cov'])
 df_samples.to_csv('/home/mvasist/scripts/coverage/coverage_bp.csv',mode='a', header=False)
 
-df_samples = pd.DataFrame(cov_cl, columns=['method', 'cov'])
-df_samples.to_csv('/home/mvasist/scripts/coverage/coverage_cl.csv',mode='a', header=False)
+# cov_CL, icl = cCL().coverage(ratio_estimator, inputs, outputs, confidence_level) # Play with the confidence level!
+# cov_cl = {'method': 'Class Logits', 'cov': [str(cov_CL)]}
+# df_samples = pd.DataFrame(cov_cl, columns=['method', 'cov'])
+# df_samples.to_csv('/home/mvasist/scripts/coverage/coverage_cl.csv',mode='a', header=False)
    
 
    
